@@ -55,6 +55,15 @@ app.post("/messages", (req, res) => {
     });
 });
 
+// Obtener todos los mensajes pendientes de aprobación
+app.get("/messages/pending", (req, res) => {
+    db.query("SELECT * FROM messages WHERE approved = 0 ORDER BY created_at DESC", (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+
 // Aprobar un mensaje
 app.put("/messages/:id/approve", (req, res) => {
     const { id } = req.params;
