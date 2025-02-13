@@ -16,6 +16,11 @@ const db = mysql.createConnection({
 });
 
 db.connect(err => {
+    console.log("MYSQLHOST:", process.env.MYSQLHOST);
+console.log("MYSQLUSER:", process.env.MYSQLUSER);
+console.log("MYSQLPASSWORD:", process.env.MYSQLPASSWORD ? "*******" : "Not Set");
+console.log("MYSQLDATABASE:", process.env.MYSQLDATABASE);
+console.log("MYSQLPORT:", process.env.MYSQLPORT);
     if (err) {
         console.error("❌ Error al conectar con la base de datos:", err);
         return;
