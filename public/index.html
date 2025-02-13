@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trafalgar Mensajes</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
+        #messages { margin-top: 20px; }
+        .message { padding: 10px; border-bottom: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+    <h1>Mensajes de San Valentín</h1>
+    <input type="text" id="messageInput" placeholder="Escribe tu mensaje...">
+    <button onclick="sendMessage()">Enviar</button>
+
+    <h2>Mensajes Aprobados</h2>
+    <div id="messages"></div>
+
+    <script>
+        const API_URL = ""; // PON AQUÍ LA URL DE TU API EN RAILWAY
+
+        function sendMessage() {
+            const text = document.getElementById("messageInput").value;
+            if (!text) return alert("Escribe un mensaje");
+            
+            fetch(`${API_URL}/messages`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text })
+            }).then(() => {
+                document.getElementById("messageInput").value = "";
+                alert("Mensaje enviado para aprobación");
+            }).catch(err => console.error("Error:", err));
+        }
+
+        function fetchMessages() {
+            fetch(`${API_URL}/messages`)
+                .then(res => res.json())
+                .then(data => {
+                    const messagesDiv = document.getElementById("messages");
+                    messagesDiv.innerHTML = data.map(msg => `<div class="message">${msg.text}</div>`).join("");
+                })
+                .catch(err => console.error("Error:", err));
+        }
+
+        fetchMessages();
+        setInterval(fetchMessages, 5000); // Refresca cada 5s
+    </script>
+</body>
+</html>

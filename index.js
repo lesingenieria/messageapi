@@ -28,6 +28,14 @@ console.log("MYSQLPORT:", process.env.MYSQLPORT);
     console.log("✅ Conectado a MySQL en Railway");
 });
 
+const path = require("path");
+
+app.use(express.static(path.join(__dirname, "public")));
+
+app.get("/", (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
 // Obtener todos los mensajes aprobados
 app.get("/messages", (req, res) => {
     db.query("SELECT * FROM messages WHERE approved = 1 ORDER BY created_at DESC", (err, results) => {
