@@ -131,7 +131,7 @@
         <button id="newMessagesButton" style="
         display: none;
         position: fixed;
-        bottom: 20px;
+        top: 20px;
         right: 20px;
         background: #007bff;
         color: white;
@@ -209,6 +209,7 @@
     likeButton.innerHTML = likedMessages[message.id] ? "❤️" : "🤍";
 
     const likeCount = document.createElement("span");
+    likeCount.classList.add("like-count");
     likeCount.textContent = message.likes || 0;
 
     likeButton.onclick = () => toggleLike(message.id, likeButton, likeCount);
@@ -217,6 +218,7 @@
     likeContainer.appendChild(likeCount);
     messageElement.appendChild(likeContainer);
 
+    messageElement.id = "msg-"+message.id;
     chatContainer.appendChild(messageElement);
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }
@@ -285,6 +287,8 @@ function loadMessages() {
     // Detectar si el usuario está abajo antes de actualizar
     const isAtBottom = chatContainer.scrollHeight - chatContainer.scrollTop <= chatContainer.clientHeight + 10;
 
+    console.log("------ Cargando mensajes ------");
+
     fetch(API_URL)
         .then(response => response.json())
         .then(messages => {
@@ -294,7 +298,28 @@ function loadMessages() {
             let newMessages = [];
 
             messages.forEach(msg => {
-                if (!document.getElementById(`msg-${msg.id}`)) {
+                const existingMessage = document.getElementById(`msg-${msg.id}`);
+
+                if (existingMessage) {
+                    console.log(`Mensaje encontrado en DOM: msg-${msg.id}`);
+
+                    // Buscar el elemento que contiene los likes
+                    const likeElement = existingMessage.querySelector(".like-count");
+                    console.log("likes", likeElement)
+                    if (likeElement) {
+                        const currentLikes = parseInt(likeElement.innerText, 10);
+                        console.log(`Likes actuales en msg-${msg.id}:`, currentLikes);
+                        console.log(`Likes en API para msg-${msg.id}:`, msg.likes);
+
+                        if (currentLikes !== msg.likes) {
+                            console.log(`Actualizando likes en msg-${msg.id}...`);
+                            likeElement.innerText = msg.likes;
+                        }
+                    } else {
+                        console.warn(`No se encontró el elemento de likes en msg-${msg.id}`);
+                    }
+                } else {
+                    console.log(`Nuevo mensaje detectado: msg-${msg.id}`);
                     newMessages.push(msg);
                     hasNewMessages = true;
                 }
@@ -305,22 +330,30 @@ function loadMessages() {
                 const latestMessageId = messages[messages.length - 1]?.id;
 
                 if (latestMessageId && latestMessageId !== lastMessageId) {
+                    console.log(`Último ID registrado: ${lastMessageId}`);
+                    console.log(`Nuevo último mensaje recibido: ${latestMessageId}`);
                     lastMessageId = latestMessageId; // Actualizar último ID registrado
 
                     if (isAtBottom) {
-                        // Si el usuario está abajo, dibujar los mensajes directamente
+                        console.log("Usuario está abajo, agregando mensajes automáticamente.");
                         newMessages.forEach(appendMessage);
                         chatContainer.scrollTop = chatContainer.scrollHeight;
                     } else {
-                        // Si el usuario NO está abajo, guardar los mensajes pendientes
+                        console.log("Usuario NO está abajo, guardando mensajes para más tarde.");
                         newMessagesPending = newMessages;
                         newMessagesButton.style.display = "block"; // Mostrar el botón
+                        console.log("Botón 'nuevos mensajes' mostrado.");
                     }
                 }
+            } else {
+                console.log("No hay mensajes nuevos.");
             }
+
+            console.log("------ Fin de carga de mensajes ------");
         })
         .catch(err => console.error("Error al cargar mensajes:", err));
 }
+
 
 // Manejar el botón de "Mensajes nuevos"
 document.getElementById("newMessagesButton").addEventListener("click", () => {
