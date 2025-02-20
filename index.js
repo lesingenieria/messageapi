@@ -39,16 +39,28 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Obtener todos los mensajes aprobados
+// Obtener todos los mensajes aprobados de los últimos 2 días
 app.get("/messages", (req, res) => {
-  db.query(
-    "SELECT * FROM messages WHERE approved = 1 ORDER BY created_at DESC",
-    (err, results) => {
-      if (err) return res.status(500).json({ error: err.message });
-      res.json(results);
-    }
-  );
-});
+    db.query(
+      "SELECT * FROM messages WHERE approved = 1 AND created_at >= DATE_SUB(NOW(), INTERVAL 2 DAY) ORDER BY created_at DESC",
+      (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+      }
+    );
+  });
+
+// Obtener todos los mensajes aprobados
+app.get("/messages/all", (req, res) => {
+    db.query(
+      "SELECT * FROM messages WHERE approved = 1 ORDER BY created_at DESC",
+      (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+      }
+    );
+  });
+  
 
 // Agregar un nuevo mensaje (sin aprobar)
 app.post("/messages", (req, res) => {
