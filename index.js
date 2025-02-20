@@ -82,5 +82,15 @@ app.delete("/messages/:id", (req, res) => {
     });
 });
 
+// Endpoint para dar like a un mensaje
+app.put("/messages/:id/like", (req, res) => {
+    const { id } = req.params;
+    db.query("UPDATE messages SET likes = likes + 1 WHERE id = ?", [id], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
+    });
+});
+
+
 const PORT = process.env.PORT || 3003;
 app.listen(PORT, () => console.log(`🚀 API corriendo en http://localhost:${PORT}`));
