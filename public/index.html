@@ -44,15 +44,23 @@
             margin: 0;
         }
         .message {
-            max-width: 70%;
-            padding: 10px;
-            border-radius: 10px;
-            margin: 5px;
-            font-size: 1em;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-        }
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 10px;
+    border-radius: 8px;
+    max-width: 70%;
+    word-wrap: break-word;
+    background: #333;
+    color: black;
+    position: relative;
+    margin: 5px 0px;
+}
+
+.text-content {
+    flex: 1; /* Ocupa la parte superior */
+    padding-bottom: 8px;
+}
         .sent {
             background-color: #dcf8c6;
             align-self: flex-end;
@@ -103,21 +111,33 @@
             font-size: 1.2em;
             color: white;
         }
+        
         .like-container {
-            display: flex;
-            align-items: center;
-            margin-top: 5px;
-            font-size: 0.9em;
-            color: #555;
-        }
-        .like-button {
-            background: none;
-            border: none;
-            cursor: pointer;
-            font-size: 1.2em;
-            margin-right: 5px;
-            color: red;
-        }
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.2); /* Separador */
+}
+
+.like-button {
+    background: transparent;
+    border: none;
+    font-size: 1.4rem;
+    cursor: pointer;
+    transition: transform 0.2s ease-in-out;
+}
+
+.like-button:hover {
+    transform: scale(1.2);
+}
+
+.like-count {
+    font-size: 0.9rem;
+    margin-left: 5px;
+    color: #bbb;
+}
+
+
     </style>
 </head>
 <body>
@@ -193,11 +213,16 @@
 
         function appendMessage(message) {
     const chatContainer = document.getElementById("chatContainer");
+
     const messageElement = document.createElement("div");
     messageElement.classList.add("message", message.sent ? "sent" : "received");
-    messageElement.textContent = message.text;
 
-    // Contenedor de Like
+    // Contenido del mensaje (parte superior)
+    const textContent = document.createElement("div");
+    textContent.classList.add("text-content");
+    textContent.textContent = message.text;
+
+    // Contenedor de Like (parte inferior)
     const likeContainer = document.createElement("div");
     likeContainer.classList.add("like-container");
 
@@ -216,12 +241,16 @@
 
     likeContainer.appendChild(likeButton);
     likeContainer.appendChild(likeCount);
+
+    // Ensamblar la estructura del mensaje
+    messageElement.appendChild(textContent);
     messageElement.appendChild(likeContainer);
 
-    messageElement.id = "msg-"+message.id;
+    messageElement.id = "msg-" + message.id;
     chatContainer.appendChild(messageElement);
     chatContainer.scrollTop = chatContainer.scrollHeight;
 }
+
 
 
         function toggleLike(id, button, countSpan) {
