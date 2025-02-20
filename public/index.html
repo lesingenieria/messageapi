@@ -127,7 +127,23 @@
         </div>
         <h2>Trafalgar 3</h2>
     </div>
-    <div class="chat-container" id="chatContainer"></div>
+    <div class="chat-container" id="chatContainer">
+        <button id="newMessagesButton" style="
+        display: none;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+    ">
+     Hay mensajes nuevos
+    </button>
+    </div>
     <div class="input-container">
         <span id="charCount" class="char-counter">50 caracteres restantes</span>
         <div class="input-wrapper">
@@ -250,7 +266,7 @@
             })
             .then(response => response.json())
             .then(data => {
-                appendMessage(data.id, text, "sent", 0);
+                appendMessage({id: data.id, text:text, sent:"sent", likes:0});
                 input.value = "";
                 updateCharCount();
                 localStorage.setItem("lastMessageTime", Date.now());
@@ -259,28 +275,75 @@
             .catch(err => console.error("Error:", err));
         }
 
-        function loadMessages(autoRefresh = false) {
+        let lastMessageId = null; // Guarda el ID del último mensaje para evitar duplicados
+let newMessagesPending = []; // Almacena mensajes nuevos sin dibujar
+
+function loadMessages() {
+    const chatContainer = document.getElementById("chatContainer");
+    const newMessagesButton = document.getElementById("newMessagesButton");
+
+    // Detectar si el usuario está abajo antes de actualizar
+    const isAtBottom = chatContainer.scrollHeight - chatContainer.scrollTop <= chatContainer.clientHeight + 10;
+
     fetch(API_URL)
         .then(response => response.json())
         .then(messages => {
-            const chatContainer = document.getElementById("chatContainer");
-            chatContainer.innerHTML = ""; // Limpiar mensajes previos para evitar duplicados
+            messages.reverse(); // Asegurar que los mensajes se muestren en orden correcto
 
-            messages.reverse().forEach(msg => appendMessage(msg));
+            let hasNewMessages = false;
+            let newMessages = [];
 
-            if (!autoRefresh) {
-                updateSendButton();
+            messages.forEach(msg => {
+                if (!document.getElementById(`msg-${msg.id}`)) {
+                    newMessages.push(msg);
+                    hasNewMessages = true;
+                }
+            });
+
+            // Si hay mensajes nuevos
+            if (hasNewMessages) {
+                const latestMessageId = messages[messages.length - 1]?.id;
+
+                if (latestMessageId && latestMessageId !== lastMessageId) {
+                    lastMessageId = latestMessageId; // Actualizar último ID registrado
+
+                    if (isAtBottom) {
+                        // Si el usuario está abajo, dibujar los mensajes directamente
+                        newMessages.forEach(appendMessage);
+                        chatContainer.scrollTop = chatContainer.scrollHeight;
+                    } else {
+                        // Si el usuario NO está abajo, guardar los mensajes pendientes
+                        newMessagesPending = newMessages;
+                        newMessagesButton.style.display = "block"; // Mostrar el botón
+                    }
+                }
             }
         })
         .catch(err => console.error("Error al cargar mensajes:", err));
 }
 
+// Manejar el botón de "Mensajes nuevos"
+document.getElementById("newMessagesButton").addEventListener("click", () => {
+    const chatContainer = document.getElementById("chatContainer");
+
+    // Dibujar los mensajes pendientes
+    newMessagesPending.forEach(appendMessage);
+    newMessagesPending = []; // Limpiar la lista de mensajes pendientes
+
+    // Hacer scroll hasta abajo
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+
+    // Ocultar el botón
+    document.getElementById("newMessagesButton").style.display = "none";
+});
+
 // Llamar a `loadMessages()` cada 5 segundos para actualizar el chat automáticamente
-setInterval(() => loadMessages(true), 5000);
+setInterval(loadMessages, 5000);
 
 // Cargar los mensajes inicialmente cuando la página se abre
 window.onload = loadMessages;
 
+    updateSendButton();
     </script>
 </body>
 </html>
