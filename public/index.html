@@ -3,134 +3,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trafalgar III - Mensajes</title>
+    <title>Chat - Trafalgar 3</title>
     <style>
         body {
-            font-family: 'Arial', sans-serif;
-            text-align: center;
-            background-color: #1a1a1a;
-            color: #e0e0e0;
+            font-family: Arial, sans-serif;
+            background-color: #ece5dd;
+            color: black;
             display: flex;
             flex-direction: column;
-            justify-content: center;
             height: 100vh;
-            align-items: center;
-            position: relative;
+            margin: 0;
         }
-        h1 {
-            font-size: 2em;
-            color: #d4af37;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
-        }
-        p {
-            font-size: 1.1em;
-            color: #b3b3b3;
-        }
-        textarea {
-            width: 100%;
-            max-width: 400px;
-            height: 80px;
-            border: 2px solid #d4af37;
-            background-color: #333;
-            color: #e0e0e0;
-            border-radius: 8px;
-            outline: none;
-            font-size: 1.2em;
-            resize: none;
-        }
-        #charCount {
-            font-size: 0.9em;
-            color: #888;
-        }
-        button {
-            background-color: #d4af37;
-            color: #1a1a1a;
-            border: none;
-            padding: 10px 20px;
-            font-size: 1em;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: 0.3s;
-            margin-top: 10px;
-            font-weight: bold;
-        }
-        button:hover {
-            background-color: #b7952b;
-        }
-        .message-box {
-            background: #222;
-            border-left: 4px solid #d4af37;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 10px auto;
-            width: 80%;
-            max-width: 400px;
-            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.3);
-            opacity: 0;
-            transform: translateY(10px);
-            animation: fadeIn 0.5s forwards;
-        }
-        @keyframes fadeIn {
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        #messages-container {
-            margin-top: 20px;
-        }
-        .overlay{
-            position:fixed;
-            height: 100vh;
-            width: 100vw;
-            background-color: rgba(0,0,0,0.8);
-            display:none;
-            justify-content: center	;
-            align-items: center;
-            animation: fadeOut 2s forwards;
-        }
-        .toast {
-            position: fixed;
-            left: 50%;
-            transform: translate(-50%);
-            background-color: #d4af37;
-            color: #1a1a1a;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: bold;
+        .chat-container {
             display: flex;
-            width: 100%;
-            height: 20%;
-            color:white;
-            justify-content: center;
-            align-items:center;
-            font-size: 1.5rem;
+            flex-direction: column;
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 10px;
         }
-        @keyframes fadeOut {
-            0% { opacity: 1; }
-            80% { opacity: 1; }
-            100% { opacity: 0; }
+        .chat-header {
+            background-color: #075e54;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            color: white;
+        }
+        .chat-header div {
+            background: black;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            margin-right: 10px;
+        }
+        .chat-header img {
+            width: 40px;
+            height: 40px;
+        }
+        .chat-header h2 {
+            font-size: 1.2em;
+            margin: 0;
+        }
+        .message {
+            max-width: 70%;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 5px;
+            font-size: 1em;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        .sent {
+            background-color: #dcf8c6;
+            align-self: flex-end;
+        }
+        .received {
+            background-color: #fff;
+            align-self: flex-start;
+        }
+        .input-container {
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            background-color: white;
+            border-top: 1px solid #ccc;
+        }
+        .char-counter {
+            font-size: 0.9em;
+            color: gray;
+            text-align: right;
+            margin-bottom: 5px;
+        }
+        .cooldown-timer {
+            font-size: 0.9em;
+            color: red;
+            text-align: center;
+            margin-top: 5px;
+        }
+        .input-wrapper {
+            display: flex;
+        }
+        .input-container input {
+            flex-grow: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 20px;
+            outline: none;
+            font-size: 1em;
+            background-color: #f0f0f0;
+            color: gray;
+        }
+        .input-container button {
+            margin-left: 10px;
+            background-color: #25d366;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2em;
+            color: white;
+        }
+        .like-container {
+            display: flex;
+            align-items: center;
+            margin-top: 5px;
+            font-size: 0.9em;
+            color: #555;
+        }
+        .like-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2em;
+            margin-right: 5px;
+            color: red;
         }
     </style>
 </head>
 <body>
-    <h1> Envíanos tu mensaje </h1>
-    <p>Deja tu declaración de amor y compártela con el resto de manera anónima.</p>
-
-    <textarea id="messageInput" placeholder="Máx. 50 caracteres" maxlength="50" oninput="updateCharCount()"></textarea>
-    <p id="charCount">50 caracteres restantes</p>
-    <button id="sendButton" onclick="sendMessage()">Enviar</button>
-    <br>
-    <small>*Los mensajes deberán aprobarse para que se muestren en pantalla</small>
-    <div class="overlay" id="overlay">
-    <div class="toast" id="toast">GRACIAS por tu mensaje</div>
+    <div class="chat-header">
+        <div>
+            <img src="./trafalgarlogo.png" alt="Trafalgar 3">
+        </div>
+        <h2>Trafalgar 3</h2>
     </div>
-    <img src="./leslogovector.svg" style="position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); height: 50px; padding: 10px; filter: drop-shadow(0px 0px 5px rgba(0,0,0,0.8));"/>
-    <img src="./trafalgarlogo.png" style="position: absolute; top: 5%; left: 50%; transform: translateX(-50%); height: 140px; filter: drop-shadow(0px 0px 5px rgba(0,0,0,0.8));"/>
+    <div class="chat-container" id="chatContainer"></div>
+    <div class="input-container">
+        <span id="charCount" class="char-counter">50 caracteres restantes</span>
+        <div class="input-wrapper">
+            <input type="text" id="messageInput" maxlength="50" placeholder="Escribe un mensaje..." oninput="updateCharCount()">
+            <button id="sendButton" onclick="sendMessage()">▶</button>
+        </div>
+        <span id="cooldownTimer" class="cooldown-timer"></span>
+    </div>
 
     <script>
-        const API_URL = ""; // PON AQUÍ LA URL DE TU API EN RAILWAY
-        const COOLDOWN_TIME = 15 * 60 * 1000; // 15 minutos en milisegundos
+        const API_URL = "/messages";
+        const COOLDOWN_TIME = 5 * 60 * 1000; // 5 minutos en milisegundos
 
         function updateCharCount() {
             const text = document.getElementById("messageInput").value;
@@ -147,52 +156,131 @@
 
         function updateSendButton() {
             const sendButton = document.getElementById("sendButton");
-            const messageArea = document.getElementById("messageInput");
-            const lastSent = localStorage.getItem("lastMessageTime");
+            const messageInput = document.getElementById("messageInput");
+            const cooldownTimer = document.getElementById("cooldownTimer");
 
             if (!canSendMessage()) {
-                messageArea.disabled = true;
+                const remainingTime = Math.ceil((COOLDOWN_TIME - (Date.now() - parseInt(localStorage.getItem("lastMessageTime")))) / 1000);
+                messageInput.disabled = true;
                 sendButton.disabled = true;
-                sendButton.textContent = "Espera "+((COOLDOWN_TIME-(Date.now()-parseInt(lastSent)))/(1000*60)).toFixed(0)+" minutos";
+                sendButton.textContent = "⏳";
+                cooldownTimer.textContent = `Debes esperar ${Math.floor(remainingTime / 60)}m ${remainingTime % 60}s`;
+
+                setTimeout(updateSendButton, 1000);
             } else {
-                messageArea.disabled = false;
+                messageInput.disabled = false;
                 sendButton.disabled = false;
-                sendButton.textContent = "Enviar";
+                sendButton.textContent = "▶";
+                cooldownTimer.textContent = "";
             }
         }
 
+        function appendMessage(message) {
+    const chatContainer = document.getElementById("chatContainer");
+    const messageElement = document.createElement("div");
+    messageElement.classList.add("message", message.sent ? "sent" : "received");
+    messageElement.textContent = message.text;
+
+    // Contenedor de Like
+    const likeContainer = document.createElement("div");
+    likeContainer.classList.add("like-container");
+
+    const likeButton = document.createElement("button");
+    likeButton.classList.add("like-button");
+
+    // Cargar estado del like desde localStorage
+    const likedMessages = JSON.parse(localStorage.getItem("likedMessages")) || {};
+    likeButton.innerHTML = likedMessages[message.id] ? "❤️" : "🤍";
+
+    const likeCount = document.createElement("span");
+    likeCount.textContent = message.likes || 0;
+
+    likeButton.onclick = () => toggleLike(message.id, likeButton, likeCount);
+
+    likeContainer.appendChild(likeButton);
+    likeContainer.appendChild(likeCount);
+    messageElement.appendChild(likeContainer);
+
+    chatContainer.appendChild(messageElement);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+
+        function toggleLike(id, button, countSpan) {
+    const likedMessages = JSON.parse(localStorage.getItem("likedMessages")) || {};
+    const isLiked = likedMessages[id]; // Verifica si ya tiene like
+    const url = `${API_URL}/${id}/${isLiked ? "unlike" : "like"}`;
+
+    fetch(url, { method: "PUT" })
+        .then(response => response.json())
+        .then(data => {
+            if (isLiked) {
+                delete likedMessages[id]; // Eliminar el like del localStorage
+                button.innerHTML = "🤍";
+            } else {
+                likedMessages[id] = true; // Guardar que este mensaje fue likeado
+                button.innerHTML = "❤️";
+            }
+
+            localStorage.setItem("likedMessages", JSON.stringify(likedMessages));
+            countSpan.textContent = data.likes;
+        })
+        .catch(err => console.error("Error:", err));
+}
+
+
+        
         function sendMessage() {
             if (!canSendMessage()) {
-                alert("Debes esperar 15 minutos antes de enviar otro mensaje.");
+                alert("Debes esperar antes de enviar otro mensaje.");
                 return;
             }
 
-            const text = document.getElementById("messageInput").value.trim();
-            if (!text) return alert("Escribe un mensaje antes de enviarlo.");
+            const input = document.getElementById("messageInput");
+            const text = input.value.trim();
+            if (!text) {
+                alert("Escribe un mensaje antes de enviarlo.");
+                return;
+            }
 
-            fetch(`${API_URL}/messages`, {
+            fetch(API_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ text })
-            }).then(() => {
-                document.getElementById("messageInput").value = "";
+            })
+            .then(response => response.json())
+            .then(data => {
+                appendMessage(data.id, text, "sent", 0);
+                input.value = "";
                 updateCharCount();
                 localStorage.setItem("lastMessageTime", Date.now());
-                showToast();
                 updateSendButton();
-            }).catch(err => console.error("Error:", err));
+            })
+            .catch(err => console.error("Error:", err));
         }
 
-        function showToast() {
-            const toast = document.getElementById("overlay");
-            toast.style.display = "flex";
-            setTimeout(() => {
-                toast.style.display = "none";
-            }, 3000);
-        }
+        function loadMessages(autoRefresh = false) {
+    fetch(API_URL)
+        .then(response => response.json())
+        .then(messages => {
+            const chatContainer = document.getElementById("chatContainer");
+            chatContainer.innerHTML = ""; // Limpiar mensajes previos para evitar duplicados
 
-        updateSendButton();
-        setInterval(updateSendButton, 1000);
+            messages.reverse().forEach(msg => appendMessage(msg));
+
+            if (!autoRefresh) {
+                updateSendButton();
+            }
+        })
+        .catch(err => console.error("Error al cargar mensajes:", err));
+}
+
+// Llamar a `loadMessages()` cada 5 segundos para actualizar el chat automáticamente
+setInterval(() => loadMessages(true), 5000);
+
+// Cargar los mensajes inicialmente cuando la página se abre
+window.onload = loadMessages;
+
     </script>
 </body>
 </html>
