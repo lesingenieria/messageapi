@@ -48,14 +48,6 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// --- DevilChat: servir el front bajo /devilchat ---
-const devilStaticPath = path.join(__dirname, "public-devil");
-app.use("/devilchat", express.static(devilStaticPath));
-// SPA catch-all para rutas hijas de /devilchat (p. ej. /devilchat/admin)
-app.get(/^\/devilchat(\/.*)?$/, (req, res) => {
-  res.sendFile(path.join(devilStaticPath, "index.html"));
-});
-
 // ===================
 //  Endpoints clásicos
 // ===================
@@ -134,9 +126,9 @@ app.put("/messages/:id/unlike", (req, res) => {
   });
 });
 
-// ===================================
-//  DevilChat (pregunta/respuestas DB)
-// ===================================
+// ===================
+//  DevilChat (API)  ⬅️ PONER ANTES DEL ESTÁTICO
+// ===================
 
 // Estado (pregunta activa)
 app.get("/devilchat/api/devil/status", (req, res) => {
@@ -156,13 +148,17 @@ app.post("/devilchat/api/admin/question", (req, res) => {
     return res.status(400).json({ error: "Texto de pregunta requerido" });
   }
   db.query("UPDATE devil_questions SET active = 0 WHERE active = 1", () => {
-    db.query("INSERT INTO devil_questions (text, active) VALUES (?, 1)", [text.trim()], (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
-      const newQ = { id: result.insertId, text: text.trim(), active: 1 };
-      io.emit("devilchat:newQuestion", newQ);
-      io.emit("devilchat:status", { active: true, question: newQ });
-      res.json({ success: true, question: newQ });
-    });
+    db.query(
+      "INSERT INTO devil_questions (text, active) VALUES (?, 1)",
+      [text.trim()],
+      (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const newQ = { id: result.insertId, text: text.trim(), active: 1 };
+        io.emit("devilchat:newQuestion", newQ);
+        io.emit("devilchat:status", { active: true, question: newQ });
+        res.json({ success: true, question: newQ });
+      }
+    );
   });
 });
 
@@ -212,12 +208,16 @@ app.post("/devilchat/api/answers", (req, res) => {
     if (e) return res.status(500).json({ error: e.message });
     if (!rows[0]) return res.status(409).json({ error: "No hay pregunta activa" });
     const qid = rows[0].id;
-    db.query("INSERT INTO devil_answers (question_id, text, approved) VALUES (?, ?, 0)", [qid, text.trim()], (err, result) => {
-      if (err) return res.status(500).json({ error: err.message });
-      const pending = { id: result.insertId, question_id: qid, text: text.trim(), approved: 0 };
-      io.emit("devilchat:pending", pending);
-      res.json({ success: true, id: pending.id });
-    });
+    db.query(
+      "INSERT INTO devil_answers (question_id, text, approved) VALUES (?, ?, 0)",
+      [qid, text.trim()],
+      (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const pending = { id: result.insertId, question_id: qid, text: text.trim(), approved: 0 };
+        io.emit("devilchat:pending", pending);
+        res.json({ success: true, id: pending.id });
+      }
+    );
   });
 });
 
@@ -256,7 +256,7 @@ app.put("/devilchat/api/admin/answers/:id/approve", (req, res) => {
   });
 });
 
-// Eliminar respuesta (pendiente o aprobada)
+// Eliminar respuesta
 app.delete("/devilchat/api/admin/answers/:id", (req, res) => {
   const { id } = req.params;
   db.query("DELETE FROM devil_answers WHERE id = ?", [id], (err) => {
@@ -276,6 +276,17 @@ app.put("/devilchat/api/answers/:id/like", (req, res) => {
       res.json({ success: true, likes: rows[0]?.likes ?? 0 });
     });
   });
+});
+
+// =======================================
+//  Static / SPA DevilChat (DESPUÉS del API)
+// =======================================
+const devilStaticPath = path.join(__dirname, "public-devil");
+app.use("/devilchat", express.static(devilStaticPath));
+
+// Catch-all que EXCLUYE /devilchat/api
+app.get(/^\/devilchat(?!\/api)(\/.*)?$/, (req, res) => {
+  res.sendFile(path.join(devilStaticPath, "index.html"));
 });
 
 // ===================
