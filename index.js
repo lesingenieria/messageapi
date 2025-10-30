@@ -163,8 +163,6 @@ app.get("/devilchat/api/devil/status", (req, res) => {
   );
 });
 
-const path = require("path");
-
 // Sirve el DevilChat frontend bajo /devilchat
 const devilStaticPath = path.join(__dirname, "public-devil");
 app.use("/devilchat", express.static(devilStaticPath));
