@@ -39,6 +39,16 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+/* ====== STATIC DevilChat ====== */
+const devilPublic = path.join(__dirname, "public-devil");
+app.use("/devilchat", express.static(devilPublic));
+app.get(/^\/devilchat(\/.*)?$/, (_, res) => {
+  res.sendFile(path.join(devilPublic, "index.html"));
+});
+app.get("/devilchat/admin", (_, res) => {
+  res.sendFile(path.join(devilPublic, "admin.html"));
+});
+
 // Obtener todos los mensajes aprobados de los últimos 2 días
 app.get("/messages", (req, res) => {
     db.query(
@@ -138,6 +148,36 @@ app.put("/messages/:id/unlike", (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ success: true, likes: rows[0].likes });
       });
+    }
+  );
+});
+
+// --- DEVILCHAT: estado simple en memoria (opcional para mostrar "activo" y la "pregunta") ---
+app.get("/devilchat/api/devil/status", (req, res) => {
+  db.query(
+    "SELECT id, text, active, created_at FROM devil_questions WHERE active = 1 ORDER BY created_at DESC LIMIT 1",
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(rows[0] || { id: null, text: null, active: 0, created_at: null });
+    }
+  );
+});
+
+const path = require("path");
+
+// Sirve el DevilChat frontend bajo /devilchat
+const devilStaticPath = path.join(__dirname, "public-devil");
+app.use("/devilchat", express.static(devilStaticPath));
+app.get(/^\/devilchat(\/.*)?$/, (req, res) => {
+  res.sendFile(path.join(devilStaticPath, "index.html"));
+});
+
+app.get("/devilchat/api/devil/status", (req, res) => {
+  db.query(
+    "SELECT id, text, active, created_at FROM devil_questions WHERE active = 1 ORDER BY created_at DESC LIMIT 1",
+    (err, rows) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json(rows[0] || { id: null, text: null, active: 0, created_at: null });
     }
   );
 });

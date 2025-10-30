@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Pregunta del Diablo</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{margin:0;background:#0b0b0c;color:#ffd6d6;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    .wrap{max-width:560px;margin:0 auto;padding:16px}
+    .card{background:#1a0e12;border:1px solid #7a1f1f;border-radius:14px;padding:14px;margin:12px 0}
+    .badge{display:inline-block;border:1px solid #ff6b6b;color:#ffbcbc;border-radius:999px;padding:2px 8px;font-weight:800;font-size:12px;letter-spacing:.5px}
+    .q{font-weight:800;color:#fff;margin-top:6px}
+    .list{display:grid;gap:8px;margin-top:10px}
+    .bubble{background:#111113;border:1px solid #2a2a2a;border-radius:12px;padding:10px 12px;color:#eee}
+    .row{display:grid;grid-template-columns:1fr 110px;gap:8px;margin-top:10px}
+    input{padding:12px;border-radius:10px;border:1px solid #884040;background:#130909;color:#fff}
+    button{border-radius:10px;border:none;font-weight:800;background:#d63384;color:#fff;cursor:pointer;padding:12px}
+    .muted{opacity:.7;font-size:12px;margin-top:6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h2 style="margin:8px 0 0 0">😈 Pregunta del Diablo</h2>
+    <div id="status" class="muted"></div>
+
+    <div class="card">
+      <div class="badge">DIABLO</div>
+      <div id="q" class="q">Buscando pregunta activa…</div>
+      <div id="qt" class="muted"></div>
+    </div>
+
+    <div class="card">
+      <div style="font-weight:800;margin-bottom:6px">Respuestas aprobadas</div>
+      <div id="answers" class="list"></div>
+
+      <div class="row">
+        <input id="inp" maxlength="240" placeholder="Susúrrale al Diablo…" />
+        <button id="send">Enviar</button>
+      </div>
+      <div id="err" class="muted" style="color:#ff6b6b"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+  <script>
+    const API = "/devilchat/api";
+    const $ = (id)=>document.getElementById(id);
+
+    let activeQ = null;
+
+    function renderAnswers(list){
+      const el = $("answers");
+      el.innerHTML = "";
+      if(!list || list.length===0){
+        el.innerHTML = '<div class="muted">Sé el primero en responder.</div>';
+        return;
+      }
+      list.forEach(a=>{
+        const li = document.createElement("div");
+        li.className = "bubble";
+        li.textContent = a.text;
+        el.appendChild(li);
+      });
+    }
+
+    async function loadStatus(){
+      const s = await fetch(`${API}/devil/status`).then(r=>r.json());
+      activeQ = s?.id ? s : null;
+      $("q").textContent = activeQ ? activeQ.text : "Aún no hay pregunta activa.";
+      $("qt").textContent = activeQ?.created_at ? new Date(activeQ.created_at).toLocaleString() : "";
+      $("status").textContent = activeQ?.active ? "Ronda ACTIVA" : "Ronda inactiva";
+    }
+
+    async function loadApproved(){
+      const list = await fetch(`${API}/answers/approved`).then(r=>r.json());
+      renderAnswers(list);
+    }
+
+    async function sendAnswer(){
+      $("err").textContent="";
+      const v = $("inp").value.trim();
+      if(!v){ $("err").textContent="Escribe algo 👀"; return; }
+      if(!activeQ || !activeQ.active){ $("err").textContent="No hay pregunta activa"; return; }
+
+      const res = await fetch(`${API}/answers`,{
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ text: v })
+      }).then(r=>r.json()).catch(()=>({error:"No se pudo enviar"}));
+
+      if(res.error){ $("err").textContent = res.error; return; }
+      $("inp").value = "";
+      // queda pendiente; cuando el admin apruebe, te llegará por socket si quieres escucharlo en tiempo real
+      alert("Tu respuesta fue enviada y está pendiente de aprobación.");
+    }
+
+    $("send").onclick = sendAnswer;
+
+    // Socket realtime (para que al aprobar se actualice)
+    const socket = io({ transports:["websocket"] });
+    socket.on("connect", ()=>{ /*noop*/ });
+
+    socket.on("devilchat:newQuestion", async ()=>{
+      await loadStatus();
+      await loadApproved();
+    });
+
+    socket.on("devilchat:new", async ()=>{
+      // nueva respuesta aprobada
+      await loadApproved();
+    });
+
+    // bootstrap
+    (async ()=>{
+      await loadStatus();
+      await loadApproved();
+    })();
+  </script>
+</body>
+</html>
