@@ -4,18 +4,13 @@ const mysql = require("mysql2");
 const cors = require("cors");
 const path = require("path");
 
-// 🔧 NUEVO: http + socket.io
+// 🔧 http + socket.io
 const http = require("http");
 const { Server } = require("socket.io");
 
 const app = express();
-// ⚠️ crea el server HTTP *antes* de escuchar
 const server = http.createServer(app);
-
-// 🔧 NUEVO: instancia de Socket.IO
-const io = new Server(server, {
-  cors: { origin: "*", credentials: true },
-});
+const io = new Server(server, { cors: { origin: "*", credentials: true } });
 
 app.use(express.json());
 app.use(cors());
@@ -42,7 +37,15 @@ db.connect((err) => {
   console.log("✅ Conectado a MySQL en Railway");
 });
 
-// --- Web estático principal (tu chat clásico por DB) ---
+// --- seguridad admin (header x-admin-key) ---
+const ADMIN_KEY = process.env.DEVIL_ADMIN_KEY || "t3devil";
+function requireAdmin(req, res, next) {
+  const key = req.get("x-admin-key") || "";
+  if (key !== ADMIN_KEY) return res.status(401).json({ error: "Unauthorized" });
+  next();
+}
+
+// --- Web estático principal (chat clásico)
 app.use(express.static(path.join(__dirname, "public")));
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
@@ -52,7 +55,6 @@ app.get("/", (req, res) => {
 //  Endpoints clásicos
 // ===================
 
-// Aprobados últimos 2 días
 app.get("/messages", (req, res) => {
   db.query(
     "SELECT * FROM messages WHERE approved = 1 AND created_at >= DATE_SUB(NOW(), INTERVAL 2 DAY) ORDER BY created_at DESC",
@@ -60,7 +62,6 @@ app.get("/messages", (req, res) => {
   );
 });
 
-// Todos aprobados
 app.get("/messages/all", (req, res) => {
   db.query(
     "SELECT * FROM messages WHERE approved = 1 ORDER BY created_at DESC",
@@ -68,7 +69,6 @@ app.get("/messages/all", (req, res) => {
   );
 });
 
-// Nuevo mensaje (pendiente)
 app.post("/messages", (req, res) => {
   const { text } = req.body || {};
   if (!text) return res.status(400).json({ error: "Mensaje requerido" });
@@ -78,7 +78,6 @@ app.post("/messages", (req, res) => {
   });
 });
 
-// Pendientes
 app.get("/messages/pending", (req, res) => {
   db.query(
     "SELECT * FROM messages WHERE approved = 0 ORDER BY created_at DESC",
@@ -86,7 +85,6 @@ app.get("/messages/pending", (req, res) => {
   );
 });
 
-// Aprobar
 app.put("/messages/:id/approve", (req, res) => {
   const { id } = req.params;
   db.query("UPDATE messages SET approved = 1 WHERE id = ?", [id], (err) => {
@@ -95,7 +93,6 @@ app.put("/messages/:id/approve", (req, res) => {
   });
 });
 
-// Eliminar
 app.delete("/messages/:id", (req, res) => {
   const { id } = req.params;
   db.query("DELETE FROM messages WHERE id = ?", [id], (err) =>
@@ -103,7 +100,6 @@ app.delete("/messages/:id", (req, res) => {
   );
 });
 
-// Likes
 app.put("/messages/:id/like", (req, res) => {
   const { id } = req.params;
   db.query("UPDATE messages SET likes = likes + 1 WHERE id = ?", [id], (err) => {
@@ -127,7 +123,7 @@ app.put("/messages/:id/unlike", (req, res) => {
 });
 
 // ===================
-//  DevilChat (API)  ⬅️ PONER ANTES DEL ESTÁTICO
+//  DevilChat (API)
 // ===================
 
 // Estado (pregunta activa)
@@ -141,8 +137,8 @@ app.get("/devilchat/api/devil/status", (req, res) => {
   );
 });
 
-// Nueva pregunta (admin): desactiva anteriores y activa la nueva
-app.post("/devilchat/api/admin/question", (req, res) => {
+// Nueva pregunta (admin) – desactiva anteriores y activa la nueva
+app.post("/devilchat/api/admin/question", requireAdmin, (req, res) => {
   const { text } = req.body || {};
   if (!text || !String(text).trim()) {
     return res.status(400).json({ error: "Texto de pregunta requerido" });
@@ -162,8 +158,8 @@ app.post("/devilchat/api/admin/question", (req, res) => {
   });
 });
 
-// Activar/Desactivar (admin) la última pregunta creada
-app.post("/devilchat/api/admin/active", (req, res) => {
+// Activar/Desactivar (admin)
+app.post("/devilchat/api/admin/active", requireAdmin, (req, res) => {
   const { active } = req.body || {};
   if (typeof active !== "boolean") {
     return res.status(400).json({ error: "active debe ser boolean" });
@@ -191,29 +187,34 @@ app.post("/devilchat/api/admin/active", (req, res) => {
 });
 
 // Listar preguntas (admin)
-app.get("/devilchat/api/admin/questions", (req, res) => {
+app.get("/devilchat/api/admin/questions", requireAdmin, (req, res) => {
   db.query(
     "SELECT id, text, active, created_at FROM devil_questions ORDER BY created_at DESC",
     (err, rows) => (err ? res.status(500).json({ error: err.message }) : res.json(rows))
   );
 });
 
-// Enviar respuesta (pendiente)
+// Enviar respuesta (público; guarda client_id opcional)
 app.post("/devilchat/api/answers", (req, res) => {
-  const { text } = req.body || {};
-  if (!text || !String(text).trim()) {
+  const { text, clientId } = req.body || {};
+  if (!text || !String(text).trim())
     return res.status(400).json({ error: "Texto requerido" });
-  }
-  db.query("SELECT id FROM devil_questions WHERE active = 1 ORDER BY created_at DESC LIMIT 1", (e, rows) => {
+
+  db.query("SELECT id FROM devil_questions WHERE active = 1 ORDER BY created_at DESC LIMIT 1",
+  (e, rows) => {
     if (e) return res.status(500).json({ error: e.message });
     if (!rows[0]) return res.status(409).json({ error: "No hay pregunta activa" });
+
     const qid = rows[0].id;
     db.query(
-      "INSERT INTO devil_answers (question_id, text, approved) VALUES (?, ?, 0)",
-      [qid, text.trim()],
+      "INSERT INTO devil_answers (question_id, text, approved, client_id) VALUES (?, ?, 0, ?)",
+      [qid, text.trim(), clientId || null],
       (err, result) => {
         if (err) return res.status(500).json({ error: err.message });
-        const pending = { id: result.insertId, question_id: qid, text: text.trim(), approved: 0 };
+        const pending = {
+          id: result.insertId, question_id: qid,
+          text: text.trim(), approved: 0, client_id: clientId || null
+        };
         io.emit("devilchat:pending", pending);
         res.json({ success: true, id: pending.id });
       }
@@ -221,8 +222,8 @@ app.post("/devilchat/api/answers", (req, res) => {
   });
 });
 
-// Pendientes (última pregunta activa)
-app.get("/devilchat/api/admin/answers/pending", (req, res) => {
+// Pendientes (última pregunta activa) (admin)
+app.get("/devilchat/api/admin/answers/pending", requireAdmin, (req, res) => {
   db.query(
     `SELECT a.* FROM devil_answers a
      JOIN devil_questions q ON q.id = a.question_id
@@ -243,8 +244,8 @@ app.get("/devilchat/api/answers/approved", (req, res) => {
   );
 });
 
-// Aprobar respuesta
-app.put("/devilchat/api/admin/answers/:id/approve", (req, res) => {
+// Aprobar respuesta (admin)
+app.put("/devilchat/api/admin/answers/:id/approve", requireAdmin, (req, res) => {
   const { id } = req.params;
   db.query("UPDATE devil_answers SET approved = 1 WHERE id = ?", [id], (err) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -256,8 +257,8 @@ app.put("/devilchat/api/admin/answers/:id/approve", (req, res) => {
   });
 });
 
-// Eliminar respuesta
-app.delete("/devilchat/api/admin/answers/:id", (req, res) => {
+// Eliminar respuesta (admin)
+app.delete("/devilchat/api/admin/answers/:id", requireAdmin, (req, res) => {
   const { id } = req.params;
   db.query("DELETE FROM devil_answers WHERE id = ?", [id], (err) => {
     if (err) return res.status(500).json({ error: err.message });
@@ -266,7 +267,7 @@ app.delete("/devilchat/api/admin/answers/:id", (req, res) => {
   });
 });
 
-// Like a respuesta
+// Like a respuesta (público)
 app.put("/devilchat/api/answers/:id/like", (req, res) => {
   const { id } = req.params;
   db.query("UPDATE devil_answers SET likes = likes + 1 WHERE id = ?", [id], (err) => {
@@ -278,13 +279,60 @@ app.put("/devilchat/api/answers/:id/like", (req, res) => {
   });
 });
 
+// Responder (como diablo) a una respuesta concreta (admin)
+app.put("/devilchat/api/admin/answers/:id/reply", requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { reply } = req.body || {};
+  if (!reply || !String(reply).trim())
+    return res.status(400).json({ error: "Respuesta del diablo requerida" });
+
+  db.query("UPDATE devil_answers SET devil_reply = ? WHERE id = ?", [reply.trim(), id], (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    db.query("SELECT id, text, client_id FROM devil_answers WHERE id = ?", [id], (e, rows) => {
+      if (e) return res.status(500).json({ error: e.message });
+      const row = rows[0];
+      if (row?.client_id) {
+        io.to(`client:${row.client_id}`).emit("devilchat:reply", { id: row.id, reply: reply.trim() });
+      }
+      io.emit("devilchat:new", { id: `devil-${Date.now()}`, text: reply.trim(), from: "devil", ts: Date.now() });
+      res.json({ success: true });
+    });
+  });
+});
+
+// Premiar un mensaje (admin)
+app.put("/devilchat/api/admin/answers/:id/reward", requireAdmin, (req, res) => {
+  const { id } = req.params;
+  let { type, code } = req.body || {};
+  if (!["shot", "drink"].includes(type)) type = "shot";
+  if (!code) code = Math.random().toString(36).slice(2, 8).toUpperCase();
+
+  db.query(
+    "UPDATE devil_answers SET reward_type = ?, reward_code = ?, reward_at = NOW() WHERE id = ?",
+    [type, code, id],
+    (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+
+      db.query("SELECT id, text, client_id FROM devil_answers WHERE id = ?", [id], (e, rows) => {
+        if (e) return res.status(500).json({ error: e.message });
+        const row = rows[0];
+
+        if (row?.client_id) {
+          io.to(`client:${row.client_id}`).emit("devilchat:reward", { id: row.id, type, code });
+        }
+        io.emit("devilchat:rewarded", { id: row.id, type });
+        res.json({ success: true, type, code });
+      });
+    }
+  );
+});
+
 // =======================================
-//  Static / SPA DevilChat (DESPUÉS del API)
+//  Static / SPA DevilChat (después del API)
 // =======================================
 const devilStaticPath = path.join(__dirname, "public-devil");
 app.use("/devilchat", express.static(devilStaticPath));
-
-// Catch-all que EXCLUYE /devilchat/api
 app.get(/^\/devilchat(?!\/api)(\/.*)?$/, (req, res) => {
   res.sendFile(path.join(devilStaticPath, "index.html"));
 });
@@ -294,10 +342,27 @@ app.get(/^\/devilchat(?!\/api)(\/.*)?$/, (req, res) => {
 // ===================
 io.on("connection", (socket) => {
   console.log("🔌 DevilChat client connected", socket.id);
+
+  // registro de cliente móvil para respuestas directas
+  socket.on("devilchat:register", ({ clientId }) => {
+    if (!clientId) return;
+    socket.join(`client:${clientId}`);
+  });
+
+  // registro del panel admin (opcional, para emisiones dirigidas)
+  socket.on("devilchat:admin:register", ({ key }) => {
+    if (key !== ADMIN_KEY) {
+      socket.emit("devilchat:admin:error", "Clave de admin inválida");
+      return;
+    }
+    socket.join("deviladmin");
+    socket.emit("devilchat:admin:ok", true);
+  });
+
   socket.on("disconnect", () => console.log("🔌 DevilChat client disconnected", socket.id));
 });
 
-// 🚀 IMPORTANTE: usar server.listen (no app.listen)
+// 🚀 server.listen
 const PORT = process.env.PORT || 3003;
 server.listen(PORT, () => {
   console.log(`🚀 API + Socket.IO corriendo en http://localhost:${PORT}`);
