@@ -1,131 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Admin DevilChat</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{--bg:#0b0b0c;--panel:#111113;--border:#262626;--txt:#eaeaea;--muted:#9aa0a6;
+           --btn:#0d6efd;--green:#198754;--red:#dc3545;--pink:#d63384}
+    body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    .wrap{max-width:900px;margin:0 auto;padding:16px}
+    .row{display:grid;grid-template-columns:1fr auto;gap:8px}
+    input,button,textarea{padding:10px;border-radius:8px;border:1px solid var(--border);background:#151516;color:var(--txt)}
+    button{background:var(--btn);border:none;font-weight:700;cursor:pointer}
+    h2,h3{margin:8px 0}
+    .list{display:grid;gap:8px}
+    .item{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--panel)}
+    .btn-green{background:var(--green)} .btn-red{background:var(--red)} .btn-pink{background:var(--pink)}
+    .muted{color:var(--muted)}
+    .tag{display:inline-block;font-size:12px;border:1px solid #7a1f1f;color:#ffbcbc;border-radius:999px;padding:2px 8px;font-weight:800;letter-spacing:.5px;background:#1a0e12; margin-bottom:8px}
+    /* Auth modal */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center}
+    .modal.show{display:flex}
+    .card{background:#141416;border:1px solid #2a2a2a;border-radius:12px;padding:16px;min-width:320px}
+    .row-sm{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:8px}
+  </style>
+</head>
 <body>
-  <div id="login" style="
-    position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
-    background:rgba(0,0,0,.85);z-index:9999">
-    <div style="width:min(92vw,360px);background:#111113;border:1px solid #262626;border-radius:12px;padding:16px">
-      <h3 style="margin:6px 0 12px 0">Acceso Admin</h3>
-      <input id="admKey" type="password" placeholder="Clave de administrador"
-             style="width:100%;padding:12px;border-radius:8px;border:1px solid #333;background:#151516;color:#eaeaea"/>
-      <button id="btnLogin" style="margin-top:10px;width:100%;padding:12px;border-radius:8px;
-              border:none;background:#0d6efd;color:#fff;font-weight:700;cursor:pointer">
-        Entrar
-      </button>
-      <div id="loginErr" class="muted" style="color:#ff6b6b;margin-top:8px"></div>
-    </div>
+  <div class="wrap">
+    <h2>Moderación – Chat del Diablo</h2>
+
+    <section>
+      <span class="tag">EL DIABLO PREGUNTA…</span>
+      <h3>Pregunta actual</h3>
+      <div class="row">
+        <input id="qtext" placeholder="Escribe la pregunta…" maxlength="240" />
+        <button class="btn-pink" id="publish">Publicar</button>
+      </div>
+      <div style="margin-top:8px">
+        <button id="toggle" class="btn-green">Activar</button>
+        <span id="status" class="muted" style="margin-left:8px"></span>
+      </div>
+    </section>
+
+    <hr style="border:none;border-top:1px solid #1e1e1e;margin:16px 0" />
+
+    <section>
+      <h3>📩 Pendientes</h3>
+      <div id="pending" class="list"></div>
+    </section>
+
+    <section>
+      <h3>✅ Aprobados</h3>
+      <div id="approved" class="list"></div>
+    </section>
   </div>
 
-  <div class="wrap"> <!-- tu panel tal cual debajo -->
-    <!-- ... (tu HTML de admin existente) ... -->
+  <!-- Modal Auth -->
+  <div id="authModal" class="modal">
+    <div class="card">
+      <h3 style="margin-top:0">Acceso administrador</h3>
+      <p class="muted" style="margin:6px 0 10px">Introduce la clave de administrador.</p>
+      <div class="row-sm">
+        <input id="adminKeyInput" type="password" placeholder="Clave admin" />
+        <button id="saveKey">Entrar</button>
+      </div>
+      <div id="authErr" class="muted" style="color:#ff6b6b;margin-top:6px"></div>
+    </div>
   </div>
 
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script>
+    // ===== Config =====
     const API = "/devilchat/api";
+    const LS_KEY = "devil_admin_key";
     const $ = (id)=>document.getElementById(id);
 
-    // ====== AUTH ======
-    function getKey(){ return localStorage.getItem("DEVIL_ADMIN_KEY") || ""; }
-    function setKey(k){ localStorage.setItem("DEVIL_ADMIN_KEY", k || ""); }
-    function needLogin(show=true){ $("login").style.display = show ? "flex" : "none"; }
-
-    async function tryKey(key){
-      // probamos una ruta admin rápida
-      const ok = await fetch(`${API}/admin/questions`, { headers:{ "x-admin-key": key }})
-        .then(r => r.ok).catch(()=>false);
-      return ok;
+    // ===== Auth helper =====
+    function getKey(){ return localStorage.getItem(LS_KEY) || ""; }
+    function setKey(k){ localStorage.setItem(LS_KEY, k); }
+    function showAuth(msg){
+      if (msg) $("authErr").textContent = msg; else $("authErr").textContent = "";
+      $("authModal").classList.add("show");
+      $("adminKeyInput").focus();
     }
+    function hideAuth(){ $("authModal").classList.remove("show"); }
 
-    $("btnLogin").onclick = async () => {
-      const key = $("admKey").value.trim();
-      $("loginErr").textContent = "";
-      if(!key){ $("loginErr").textContent = "Introduce la clave"; return; }
-      const ok = await tryKey(key);
-      if(!ok){ $("loginErr").textContent = "Clave incorrecta"; return; }
-      setKey(key); needLogin(false); bootstrap();
-    };
-
-    // ====== fetch helper con header ======
-    async function aFetch(url, opts={}){
+    async function authFetch(url, opts={}){
       const key = getKey();
-      const headers = Object.assign({}, opts.headers || {}, { "x-admin-key": key });
-      return fetch(url, Object.assign({}, opts, { headers }));
+      const headers = new Headers(opts.headers || {});
+      headers.set("x-admin-key", key);
+      headers.set("Content-Type", "application/json");
+      const res = await fetch(url, { ...opts, headers });
+      if (res.status === 401){
+        showAuth("Clave inválida o ausente.");
+        throw new Error("401 Unauthorized");
+      }
+      return res;
     }
 
-    // === Sobrescribe TODAS las llamadas fetch del panel ===
-    // Cambia:
-    //   fetch(`${API}/admin/answers/pending`).then(...)
-    // Por:
-    //   aFetch(`${API}/admin/answers/pending`).then(...)
+    // ===== UI helpers =====
+    function row(text, rightHtml){
+      const div = document.createElement("div");
+      div.className = "item";
+      const left = document.createElement("div");
+      left.textContent = text;
+      const right = document.createElement("div");
+      right.innerHTML = rightHtml;
+      div.appendChild(left); div.appendChild(right);
+      return div;
+    }
 
-    // Ejemplos (sustituye en tu código):
+    // ===== Data loaders =====
     async function loadStatus(){
-      const s = await aFetch(`${API}/devil/status`).then(r=>r.json());
-      $("status").textContent = s?.active ? "Ronda ACTIVA" : "Ronda inactiva";
-      $("toggle").textContent = s?.active ? "Desactivar" : "Activar";
+      try{
+        const s = await fetch(`${API}/devil/status`).then(r=>r.json()); // pública, sin clave
+        const el = $("status"); if (!el) return;
+        el.textContent = s?.active ? "Ronda ACTIVA" : "Ronda inactiva";
+        const btn = $("toggle"); if (btn) btn.textContent = s?.active ? "Desactivar" : "Activar";
+      }catch(e){ /* noop */ }
     }
+
     async function publish(){
       const text = $("qtext").value.trim();
       if(!text){ alert("Escribe la pregunta"); return; }
-      await aFetch(`${API}/admin/question`,{
-        method:"POST", headers:{ "Content-Type":"application/json" },
+      await authFetch(`${API}/admin/question`,{
+        method:"POST",
         body: JSON.stringify({ text })
       });
       $("qtext").value = "";
-      await loadStatus(); await refreshLists();
+      await loadStatus();
+      await refreshLists();
     }
+
     async function toggleActive(){
-      const s = await aFetch(`${API}/devil/status`).then(r=>r.json());
+      // leer estado público
+      const s = await fetch(`${API}/devil/status`).then(r=>r.json());
       const next = !(s?.active);
-      await aFetch(`${API}/admin/active`,{
-        method:"POST", headers:{ "Content-Type":"application/json" },
+      await authFetch(`${API}/admin/active`,{
+        method:"POST",
         body: JSON.stringify({ active: next })
       });
       await loadStatus();
     }
+
     async function refreshLists(){
-      const [pending, approved] = await Promise.all([
-        aFetch(`${API}/admin/answers/pending`).then(r=>r.json()),
-        aFetch(`${API}/answers/approved`).then(r=>r.json()),
-      ]);
-      // ... (tu render)
+      try{
+        const [pending, approved] = await Promise.all([
+          authFetch(`${API}/admin/answers/pending`).then(r=>r.json()),
+          fetch(`${API}/answers/approved`).then(r=>r.json()), // pública
+        ]);
+
+        const p = $("pending"); p.innerHTML="";
+        if(pending.length===0) p.innerHTML = '<div class="muted">Sin pendientes</div>';
+        pending.forEach(m=>{
+          const el = row(m.text, `
+            <button class="btn-green" data-approve="${m.id}">Aprobar</button>
+            <button class="btn-pink" data-reply="${m.id}">Responder</button>
+            <button class="btn-red" data-del="${m.id}">Eliminar</button>
+            <div style="margin-top:6px; text-align:right">
+              <button class="btn-green" data-reward="${m.id}" data-type="shot">🎯 Shot</button>
+              <button class="btn-green" data-reward="${m.id}" data-type="drink">🍹 Copa</button>
+            </div>
+          `);
+          p.appendChild(el);
+        });
+
+        const a = $("approved"); a.innerHTML="";
+        if(approved.length===0) a.innerHTML = '<div class="muted">Sin aprobados</div>';
+        approved.slice().reverse().forEach(m=>{
+          const el = row(m.text, `
+            <button class="btn-pink" data-reply="${m.id}">Responder</button>
+            <button class="btn-red" data-del="${m.id}">Eliminar</button>
+            <div style="margin-top:6px; text-align:right">
+              <button class="btn-green" data-reward="${m.id}" data-type="shot">🎯 Shot</button>
+              <button class="btn-green" data-reward="${m.id}" data-type="drink">🍹 Copa</button>
+            </div>
+          `);
+          a.appendChild(el);
+        });
+      }catch(e){
+        // Si es 401 ya se mostró modal, no romper
+      }
     }
+
     async function approve(id){
-      await aFetch(`${API}/admin/answers/${id}/approve`,{ method:"PUT" });
+      await authFetch(`${API}/admin/answers/${id}/approve`,{ method:"PUT" });
       await refreshLists();
     }
     async function removeMsg(id){
-      await aFetch(`${API}/admin/answers/${id}`,{ method:"DELETE" });
+      await authFetch(`${API}/admin/answers/${id}`,{ method:"DELETE" });
       await refreshLists();
     }
-    async function replyTo(id){
-      const ta = document.querySelector(`[data-reply-text="${CSS.escape(id)}"]`);
-      const reply = (ta?.value || "").trim();
-      if(!reply){ alert("Escribe una respuesta"); return; }
-      await aFetch(`${API}/admin/answers/${id}/reply`,{
-        method:"PUT", headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ reply })
+    async function sendReply(id){
+      const reply = prompt("Respuesta del Diablo:");
+      if(!reply) return;
+      await authFetch(`${API}/admin/answers/${id}/reply`,{
+        method:"PUT", body: JSON.stringify({ reply })
       });
-      ta.value = "";
       await refreshLists();
     }
-    async function reward(id, kind){
-      const { code } = await aFetch(`${API}/admin/answers/${id}/reward`,{
-        method:"PUT", headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ type: kind })
-      }).then(r=>r.json());
-      alert(`Premio enviado. Código: ${code}`);
+    async function rewardMsg(id, type){
+      const code = prompt(`Código para el premio (${type}). Déjalo vacío para generar aleatorio:`, "");
+      await authFetch(`${API}/admin/answers/${id}/reward`,{
+        method:"PUT", body: JSON.stringify({ type, code: code || undefined })
+      });
       await refreshLists();
+      alert("Premio enviado al móvil del usuario (si tenía clientId) y marcado en pantalla.");
     }
 
-    // ====== Socket con registro admin ======
+    document.addEventListener("click",(e)=>{
+      const a = e.target.getAttribute("data-approve");
+      const d = e.target.getAttribute("data-del");
+      const r = e.target.getAttribute("data-reply");
+      const rw = e.target.getAttribute("data-reward");
+      const rwt = e.target.getAttribute("data-type");
+      if(a) approve(a);
+      if(d) removeMsg(d);
+      if(r) sendReply(r);
+      if(rw) rewardMsg(rw, rwt || "shot");
+    });
+
+    $("publish").onclick = publish;
+    $("toggle").onclick = toggleActive;
+
+    // ===== Auth modal events =====
+    $("saveKey").onclick = ()=>{
+      const k = $("adminKeyInput").value.trim();
+      if(!k){ $("authErr").textContent = "Introduce una clave válida."; return; }
+      setKey(k);
+      hideAuth();
+      bootstrap(); // reintentar
+    };
+
+    // ===== Socket realtime =====
     let socket;
     function connectSocket(){
+      if (socket) try{ socket.disconnect(); }catch{}
       socket = io({ transports:["websocket"] });
       socket.on("connect", ()=>{
         const key = getKey();
         socket.emit("devilchat:admin:register", { key });
       });
-      socket.on("devilchat:admin:error", (msg)=>{ alert(msg); needLogin(true); });
+      socket.on("devilchat:admin:error", (msg)=> showAuth(msg || "Clave inválida"));
       socket.on("devilchat:pending", refreshLists);
       socket.on("devilchat:new", refreshLists);
       socket.on("devilchat:newQuestion", async ()=>{ await loadStatus(); await refreshLists(); });
@@ -133,14 +249,16 @@
     }
 
     async function bootstrap(){
-      await loadStatus(); await refreshLists(); connectSocket();
+      await loadStatus();
+      await refreshLists();
+      connectSocket();
     }
 
-    // Auto: si hay clave almacenada y es válida, entra directo
+    // Inicio
     (async ()=>{
-      const stored = getKey();
-      if(stored && await tryKey(stored)){ needLogin(false); bootstrap(); }
-      else needLogin(true);
+      if (!getKey()) showAuth();
+      await bootstrap();
     })();
   </script>
 </body>
+</html>
